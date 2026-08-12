@@ -1,3 +1,7 @@
+# Pure JS Tiptap Editor
+A minimalist, high-performance rich text editor built using **Tiptap** and **Pure Vanilla JavaScript**. 
+
+---
 # 👉 TipTap 套件建置
 
 ### **Step 1. 建立臨時資料夾** 
