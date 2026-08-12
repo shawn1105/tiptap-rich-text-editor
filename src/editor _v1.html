@@ -1,0 +1,1191 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Tiptap Vanilla JS</title>
+    <style>
+        /* #region 編輯器、工具列、文字編輯區塊 */
+        /* 外層固定高度容器 */
+        .editor-container {
+            display: flex;
+            flex-direction: column;
+            height: 600px;
+            background-color: #f5f7fa;
+            border: 1px solid #dcdfe6;
+        }
+
+        /* 核心紙張外殼（限定寬度，並將工具列與編輯區綁在一起） */
+        .paper-wrapper {
+            width: 100%;
+            /* 限制紙張寬度 */
+            background-color: #ffffff;
+            border: 1px solid #9d9d9d;
+            box-shadow: none;
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            height: max-content;
+            /* 高度隨內容增長 */
+            min-height: 100%;
+            overflow: hidden;
+        }
+
+        /* 工具列：鑲嵌在頂部 */
+        .editor-toolbar {
+            background-color: #f9f9f9;
+            border-bottom: 1px solid #9d9d9d;
+            padding: 10px 16px;
+            display: flex;
+            /* 自動換行 */
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: center;
+            border-top-left-radius: 6px;
+            border-top-right-radius: 6px;
+            position: sticky;
+            top: -40px;
+            z-index: 10;
+        }
+
+        .editor-toolbar select {
+            height: 28px;
+            max-width: 110px;
+            width: 110px;
+            padding: 0 20px 0 4px;
+            font-size: 12px;
+            cursor: pointer;
+            color: #333;
+            -moz-appearance: none;
+            appearance: none;
+            -webkit-appearance: none;
+            background-color: #fff;
+            border: 1px solid #b6b6b4;
+        }
+
+        /* 工具列按鈕樣式 */
+        .editor-toolbar .button-LB,
+        .editor-toolbar button {
+            background: none;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            padding: 4px 4px;
+            cursor: pointer;
+            color: #606266;
+            width: max-content;
+            height: max-content;
+            box-sizing: border-box;
+            flex-shrink: 0;
+        }
+
+        .editor-toolbar .button-LB:not(:disabled):hover,
+        .editor-toolbar .button-LB.is-active,
+        .editor-toolbar button:not(:disabled):hover,
+        .editor-toolbar button.is-active {
+            background-color: #f0f0f0;
+            color: #409eff;
+        }
+
+        .editor-toolbar .divider {
+            width: 1px;
+            height: 20px;
+            background-color: #9d9d9d;
+        }
+
+        /* 強烈建議加上：被禁用時的專屬視覺樣式 */
+        .editor-toolbar button:disabled {
+            color: #c0c4cc;
+            /* 文字或圖示線條變灰 */
+            cursor: not-allowed;
+            /* 滑鼠游標變成「禁止點擊」的圖示 */
+            background-color: transparent;
+            /* 確保背景不會變色 */
+        }
+
+        /* 如果按鈕內有圖片，順便讓圖片在禁用時變透明（視覺上變灰） */
+        .editor-toolbar button:disabled img {
+            opacity: 0.4;
+            /* 圖片透明度調低，看起來就是灰掉的效果 */
+        }
+
+        /* 文字編輯範圍 */
+        .editor-content {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        /* Tiptap 核心 ProseMirror 節點 */
+        .editor-content .ProseMirror {
+            min-height: 450px;
+            padding: 40px;
+            /* 紙張內部的文字留白 */
+            outline: none;
+            box-sizing: border-box;
+            font-family: sans-serif;
+            line-height: 1.6;
+        }
+
+        /* 文字編輯區顯示禁用 */
+        .editor-locked {
+            background-color: #f5f5f5;
+            color: #666;
+            cursor: not-allowed;
+        }
+
+        /* #endregion 編輯器、工具列、文字編輯區塊 */
+
+        /* #region 子工具列區塊 */
+        .editor-sub-toolbar {
+            /* 預設隱藏 */
+            display: none;
+            flex-direction: column;
+            background-color: #ffffff;
+            border-bottom: 1px solid #222222;
+            padding: 8px 16px;
+            align-items: left;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        /* 輸入框樣式 */
+        .link-input {
+            flex: 1;
+            padding: 6px 12px;
+            border: 1px solid #dcdfe6;
+            border-radius: 4px;
+            outline: none;
+            font-size: 14px;
+        }
+
+        .link-input:focus {
+            /* 聚焦時變藍色 */
+            border-color: #409eff;
+        }
+
+        /* 動作按鈕群組 */
+        .sub-toolbar-actions {
+            display: flex;
+            gap: 6px;
+        }
+
+        .sub-toolbar-actions button {
+            padding: 6px 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: bold;
+            border: 1px solid;
+        }
+
+        /* 確認按鈕（藍底白字） */
+        .btn-sub-primary {
+            background-color: #1890ff;
+            color: #ffffff;
+        }
+
+        .btn-sub-primary:hover {
+            background-color: #40a9ff;
+        }
+
+        /* 移除按鈕（紅底白字） */
+        .btn-sub-danger {
+            background-color: #ff4d4f;
+            color: #ffffff;
+        }
+
+        .btn-sub-danger:hover {
+            background-color: #ff7875;
+        }
+
+        /* 取消按鈕（白底黑字黑邊） */
+        .btn-sub-secondary {
+            background-color: #ffffff;
+            border-color: #dcdfe6;
+            color: #333333;
+        }
+
+        .btn-sub-secondary:hover {
+            background-color: #f5f5f5;
+        }
+
+        /* #endregion 子工具列區塊 */
+
+        /* #region 文字編輯區塊內標籤設定 */
+        /* 背景色*/
+        mark,
+        strong,
+        em,
+        u {
+            /*設定背景色的文字不被 base css 改變文字大小*/
+            font-size: inherit;
+        }
+
+        /* 引用段落 */
+        blockquote {
+            border-left: 3px solid #b6b6b4;
+            margin: .5em 0;
+            padding: .2em 0 .2em 1em;
+            color: #555;
+        }
+
+        /* #endregion 文字編輯區塊內標籤設定 */
+
+        /* #region 文字編輯器工具功能調整 */
+        /* #region 顏色選擇盤 */
+        /* 位置出現在按鈕下方 */
+        .color-picker {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 1px;
+            opacity: 0;
+            border: none;
+            padding: 0;
+            margin: 0;
+            pointer-events: none;
+        }
+
+        /* #endregion 顏色選擇盤位置出現在按鈕下方 */
+
+        /* #region 全螢幕 */
+        /* 進入全螢幕時：強行覆蓋所有原本的高度與寬度 */
+        .editor-container.is-fullscreen {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100vh !important;
+            z-index: 9999 !important;
+            /* 確保壓在最上層 */
+            border: none !important;
+            border-radius: 0 !important;
+        }
+
+        .editor-container.is-fullscreen .paper-wrapper {
+            /* 全螢幕時稍微放大紙張寬度 */
+            height: 100% !important;
+            border-radius: 0 !important;
+        }
+
+        /* #endregion 全螢幕 */
+
+        /* #region 表格設定 彈出視窗 */
+        /* 彈出視窗主體 */
+        .editor-modal {
+            border: 2px solid #222222;
+            /* 跟你外框一致的明顯深色 */
+            border-radius: 6px;
+            padding: 0;
+            width: 300px;
+            background: #ffffff;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            outline: none;
+        }
+
+        /* 遮罩背景（點開時後面黑黑的透明層） */
+        .editor-modal::backdrop {
+            background: rgba(0, 0, 0, 0.4);
+        }
+
+        .modal-header {
+            padding: 12px 16px;
+            font-weight: bold;
+            font-size: 16px;
+            border-bottom: 1px solid #222222;
+            background: #f9f9f9;
+            /* 跟工具列同色的灰色 */
+        }
+
+        .modal-body {
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .input-group {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .input-group label {
+            font-size: 14px;
+            color: #222222;
+        }
+
+        /* 輸入欄位樣式調整 */
+        .input-group input {
+            width: 100px;
+            padding: 6px;
+            border: 1px solid #222222;
+            /* 骨架感框線 */
+            border-radius: 4px;
+            outline: none;
+            font-size: 14px;
+        }
+
+        .modal-footer {
+            padding: 12px 16px;
+            border-top: 1px solid #eaeaea;
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        /* 視窗按鈕基底 */
+        .modal-footer button {
+            padding: 6px 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .btn-secondary {
+            background: #ffffff;
+            border: 1px solid #222222;
+            color: #222222;
+        }
+
+        .btn-secondary:hover {
+            background: #f0f0f0;
+        }
+
+        .btn-primary {
+            background: #115cff;
+            /* 主按鈕反白，填滿黑色 */
+            border: 1px solid #222222;
+            color: #ffffff;
+        }
+
+        /* 產生的Table樣式 */
+        .btn-primary:hover {
+            background: #000000;
+        }
+
+        #tiptap-editor table {
+            display: table !important;
+            border-collapse: collapse !important;
+            table-layout: auto !important;
+            width: var(--table-width, 100%);
+        }
+
+        #tiptap-editor td,
+        #tiptap-editor th {
+            display: table-cell !important;
+            width: auto !important;
+            min-width: max-content;
+            box-sizing: border-box !important;
+            border: var(--table-border-width, 1px) solid #222222 !important;
+            padding: 8px !important;
+        }
+
+        #tiptap-editor colgroup {
+            display: table-column-group !important;
+        }
+
+        #tiptap-editor col {
+            display: table-column !important;
+        }
+
+        #tiptap-editor tr {
+            display: table-row !important;
+        }
+
+        /* #endregion 表格設定 彈出視窗 */
+
+        /* #region 圖片角落拖曳調整大小 */
+        img {
+            display: block;
+        }
+
+        [data-resize-handle] {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            border-radius: 2px;
+            z-index: 10;
+
+            /* Corner handles */
+            &[data-resize-handle='top-left'],
+            &[data-resize-handle='top-right'],
+            &[data-resize-handle='bottom-left'],
+            &[data-resize-handle='bottom-right'] {
+                width: 8px;
+                height: 8px;
+            }
+
+            &[data-resize-handle='top-left'] {
+                top: -4px;
+                left: -4px;
+                cursor: nwse-resize;
+            }
+
+            &[data-resize-handle='top-right'] {
+                top: -4px;
+                right: -4px;
+                cursor: nesw-resize;
+            }
+
+            &[data-resize-handle='bottom-left'] {
+                bottom: -4px;
+                left: -4px;
+                cursor: nesw-resize;
+            }
+
+            &[data-resize-handle='bottom-right'] {
+                bottom: -4px;
+                right: -4px;
+                cursor: nwse-resize;
+            }
+
+            /* Edge handles */
+            &[data-resize-handle='top'],
+            &[data-resize-handle='bottom'] {
+                height: 6px;
+                left: 8px;
+                right: 8px;
+            }
+
+            &[data-resize-handle='top'] {
+                top: -3px;
+                cursor: ns-resize;
+            }
+
+            &[data-resize-handle='bottom'] {
+                bottom: -3px;
+                cursor: ns-resize;
+            }
+
+            &[data-resize-handle='left'],
+            &[data-resize-handle='right'] {
+                width: 6px;
+                top: 8px;
+                bottom: 8px;
+            }
+
+            &[data-resize-handle='left'] {
+                left: -3px;
+                cursor: ew-resize;
+            }
+
+            &[data-resize-handle='right'] {
+                right: -3px;
+                cursor: ew-resize;
+            }
+
+        }
+
+        [data-resize-state='true'] [data-resize-wrapper] {
+            outline: 1px solid rgba(0, 0, 0, 0.25);
+            border-radius: 0.125rem;
+        }
+
+        /* #endregion 圖片角落拖曳調整大小 */
+
+        /* #endregion 文字編輯器工具功能調整 */
+    </style>
+
+</head>
+
+<script>
+    var editor;
+</script>
+<!-- Tiptap 編輯器載入、監聽、顯示 -->
+<script type="module">
+    import { initEditor } from './TiptapEditor/editor.js';
+    editor = initEditor();
+    //#region 編輯器功能功能監聽事件
+    // [編輯器功能] 1.字體選擇
+    document.getElementById('fontFamily-select').addEventListener('change', (e) => {
+        const selectedFont = e.target.value;
+        editor.chain().focus().setFontFamily(selectedFont).run();
+    });
+
+    // [編輯器功能] 2.字體大小
+    document.getElementById('fontSize-select').addEventListener('change', (e) => {
+        const selectedSize = e.target.value;
+        if (selectedSize === '') {
+            editor.chain().focus().unsetFontSize().run();
+        } else {
+            editor.chain().focus().setFontSize(selectedSize).run();
+        }
+    });
+
+    // [編輯器功能] 3.粗體
+    document.getElementById('bold-btn').addEventListener('click', () => {
+        editor.chain().focus().toggleBold().run()
+    });
+
+    // [編輯器功能] 4.斜體
+    document.getElementById('italic-btn').addEventListener('click', () => {
+        editor.chain().focus().toggleItalic().run()
+    });
+
+    // [編輯器功能] 5.底線
+    document.getElementById('underline-btn').addEventListener('click', () => {
+        editor.chain().focus().toggleUnderline().run()
+    });
+
+    // [編輯器功能] 6.字體顏色，監聽調色盤的顏色變更
+    document.getElementById('fontColor-btn').addEventListener('click', (e) => {
+        document.getElementById('hiddenFontColorPicker').click();
+    });
+    document.getElementById('hiddenFontColorPicker').addEventListener('change', (e) => {
+        const color = e.target.value;
+        editor.chain().focus().setColor(color).run();
+    });
+    // 清除字體顏色
+    document.getElementById('clearFontColor').addEventListener('click', () => {
+        editor.chain().focus().unsetColor().run();
+    });
+
+    // [編輯器功能] 7.字體背景色，監聽調色盤的顏色變更
+    document.getElementById('backgroundColor-btn').addEventListener('click', (e) => {
+        document.getElementById('hiddenBackgroundColorPicker').click();
+    });
+    document.getElementById('hiddenBackgroundColorPicker').addEventListener('change', (e) => {
+        const color = e.target.value;
+        editor.chain().focus().setHighlight({ color: color }).run();
+    });
+    // 清除字體背景色
+    document.getElementById('clearBackgroundColor').addEventListener('click', () => {
+        editor.chain().focus().unsetHighlight().run();
+    });
+
+    // [編輯器功能] 8.靠左對齊
+    document.getElementById('alignLeft-btn').addEventListener('click', () => {
+        editor.chain().focus().setTextAlign('left').run()
+    });
+    // [編輯器功能] 9.置中對齊
+    document.getElementById('alignCenter-btn').addEventListener('click', () => {
+        editor.chain().focus().setTextAlign('center').run()
+    });
+    // [編輯器功能] 10.靠右對齊
+    document.getElementById('alignRight-btn').addEventListener('click', () => {
+        editor.chain().focus().setTextAlign('right').run()
+    });
+    // [編輯器功能] 11.左右對齊
+    document.getElementById('justify-btn').addEventListener('click', () => {
+        editor.chain().focus().setTextAlign('justify').run()
+    });
+
+    // [編輯器功能] 12.符號清單
+    document.getElementById('list-btn').addEventListener('click', () => {
+        editor.chain().focus().toggleBulletList().run();
+    });
+    // [編輯器功能] 13.數字清單
+    document.getElementById('numlist-btn').addEventListener('click', () => {
+        editor.chain().focus().toggleOrderedList().run();
+    });
+
+    // [編輯器功能] 14.減少縮排
+    document.getElementById('decreaseIndent-btn').addEventListener('click', () => {
+        editor.chain().focus().outdent().run();
+    });
+    // [編輯器功能] 15.增加縮排
+    document.getElementById('increaseIndent-btn').addEventListener('click', () => {
+        editor.chain().focus().indent().run();
+    });
+
+    // [編輯器功能] 16.引用段落
+    document.getElementById('quote-btn').addEventListener('click', () => {
+        editor.chain().focus().toggleBlockquote().run();
+    });
+
+    // [編輯器功能] 17.水平線
+    document.getElementById('horizon-btn').addEventListener('click', () => {
+        editor.chain().focus().setHorizontalRule().run()
+    });
+
+    // [編輯器功能] 18.表格
+    const tableDialog = document.getElementById('tableDialog');
+    const tableCancel = document.getElementById('tableCancel-btn');
+    const tableConfirm = document.getElementById('tableConfirm-btn');
+    // 開啟彈出視窗
+    document.getElementById('table-btn').addEventListener('click', () => {
+        document.getElementById('tableRows-num').value = 3;
+        document.getElementById('tableCols-num').value = 3;
+        document.getElementById('tableBorder-num').value = 1;
+        document.getElementById('tableWidth-num').value = 500;
+
+        tableDialog.showModal();
+    });
+    // 點擊取消，關閉
+    tableCancel.addEventListener('click', () => {
+        tableDialog.close();
+    });
+    // 點擊確認，讀取數值，產生表格並送給 Tiptap
+    tableConfirm.addEventListener('click', () => {
+        const rows = parseInt(document.getElementById('tableRows-num').value, 10) || 3;
+        const cols = parseInt(document.getElementById('tableCols-num').value, 10) || 3;
+        const borderWidth = parseInt(document.getElementById('tableBorder-num').value, 10) || 1;
+        const tableWidth = parseInt(document.getElementById('tableWidth-num').value, 10) || 1;
+
+        editor.chain().focus().insertTable({
+            rows: rows,
+            cols: cols,
+            withHeaderRow: true
+        }).run();
+        // Tiptap 插入表格後在外層產生一個 <table> 標籤
+        // 更改框線大小
+        setTimeout(() => {
+            const tables = document.querySelectorAll('#tiptap-editor table');
+            if (tables.length > 0) {
+                // 抓到畫面上剛剛被插入的那張最新表格
+                const latestTable = tables[tables.length - 1];
+                // 將使用者輸入的框線粗細，透過 CSS 變數調整該表格
+                latestTable.style.setProperty('--table-border-width', `${borderWidth}px`);
+                latestTable.style.setProperty('--table-width', `${tableWidth}px`);
+            }
+        }, 0);
+        // 關閉視窗
+        tableDialog.close();
+    });
+    //刪除表格
+    document.getElementById('deleteTable-btn').addEventListener('click', () => {
+        editor.chain().focus().deleteTable().run();
+    });
+
+    // [編輯器功能] 19.超連結
+    document.getElementById('link-btn').addEventListener('click', () => {
+        if (document.getElementById('link-input-bar').style.display === 'flex') {
+            showSubToolbar(null);
+        } else {
+            showSubToolbar('link');
+        }
+        // 查看目前有沒有選取連結，若有抓出舊 URL 當預設值
+        const previousUrl = editor.getAttributes('link').href;
+        if (previousUrl) {
+            document.getElementById('linkHref-input').value = previousUrl;
+        }
+        document.getElementById('linkHref-input').focus();
+    });
+    // 超連結確認按鈕
+    document.getElementById('linkConfirm-btn').addEventListener('click', () => {
+        const url = document.getElementById('linkHref-input').value;
+        editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+        showSubToolbar(null);
+    });
+    // 超連結移除按鈕
+    document.getElementById('linkRemove-btn').addEventListener('click', () => {
+        editor.chain().focus().extendMarkRange('link').unsetLink().run();
+        showSubToolbar(null);
+    });
+    // 超連結取消按鈕
+    document.getElementById('linkCancel-btn').addEventListener('click', () => {
+        showSubToolbar(null);
+    });
+
+    // [編輯器功能] 20.插入圖片
+    document.getElementById('importImage-btn').addEventListener('click', () => {
+        if (document.getElementById('image-input-bar').style.display === 'flex') {
+            showSubToolbar(null);
+        } else {
+            showSubToolbar('image');
+        }
+    });
+    // 插入圖片確認按鈕
+    document.getElementById('imageConfirm-btn').addEventListener('click', () => {
+        const url = document.getElementById('imageHref-input').value;
+        editor.chain().focus().setImage({ src: url }).run();
+        showSubToolbar(null);
+    });
+    // 插入圖片取消按鈕
+    document.getElementById('imageCancel-btn').addEventListener('click', () => {
+        showSubToolbar(null);
+    });
+    // 上傳圖片按鈕
+    const uploadBtn = document.getElementById('imageUpload-btn');
+    uploadBtn.addEventListener('click', () => {
+        fileInput.click();
+    });
+    const fileInput = document.getElementById('image-file');
+    fileInput.addEventListener('change', (event) => {
+        // 確保拿到單一檔案
+        const file = event.target.files[0];
+        if (!file) return;
+        // 設定API後端接收網址
+        //editor.commands.setUploadUrl('aaa/test');
+        // 呼叫自定義上傳圖片指令
+        editor.commands.uploadImageFile(file);
+        // 清空 input 確保同一張圖能重複選取觸發
+        fileInput.value = '';
+        // 呼叫你的 API 發送函式...
+        /*
+        const formData = new FormData();
+        formData.append('upload', fileObject); // 直接塞入，準備送出
+        fetch('/aaa/test', {
+            method: 'POST',
+            body: formData // 瀏覽器會自動封裝成 multipart/form-data
+        })
+            .then(res => res.json())
+            .then(data => {
+                // 後端存完檔案後，回傳公開 URL，再由 Tiptap 渲染出來
+                editor.chain().focus().setImage({ src: data.url }).run();
+            });
+        */
+    });
+
+    // [編輯器功能] 21.搜尋及取代
+    document.getElementById('findReplace-btn').addEventListener('click', () => {
+        if (document.getElementById('search-replace-input-bar').style.display === 'flex') {
+            showSubToolbar(null);
+        } else {
+            showSubToolbar('searchandreplace');
+        }
+    });
+    // 綁定輸入文字元件
+    const searchInput = document.getElementById('search-input');
+    const replaceInput = document.getElementById('replace-input');
+    // 搜尋
+    document.getElementById('searchnext-btn').addEventListener('click', () => {
+        const query = searchInput.value;
+        editor.commands.searchAndSelectNext(query);
+    });
+    // 取代
+    document.getElementById('replace-btn').addEventListener('click', () => {
+        const replaceWith = replaceInput.value;
+        editor.commands.searchAndReplaceCurrent(replaceWith);
+        const query = searchInput.value;
+        editor.commands.searchAndSelectNext(query);
+    });
+    // 全部取代
+    document.getElementById('replaceall-btn').addEventListener('click', () => {
+        const query = searchInput.value;
+        const replaceWith = replaceInput.value;
+        editor.commands.searchAndReplaceAll(query, replaceWith);
+    });
+    // 設定搜尋選項
+    function updateSearchOptions() {
+        editor.commands.setSearchOptions({
+            matchCase: document.getElementById("matchCase-chk").checked,
+            wholeWord: document.getElementById("wholeWord-chk").checked,
+            wrapSearch: document.getElementById("wrapSearch-chk").checked
+        });
+        // 當使用者變更搜尋選項，清除舊狀態
+        editor.commands.clearSearch();
+    }
+    document.getElementById("matchCase-chk").addEventListener("change", updateSearchOptions);
+    document.getElementById("wholeWord-chk").addEventListener("change", updateSearchOptions);
+    document.getElementById("wrapSearch-chk").addEventListener("change", updateSearchOptions);
+    // 搜尋及取代關閉按鈕
+    document.getElementById('search-replace-Cancel-btn').addEventListener('click', () => {
+        showSubToolbar(null);
+    });
+    // 當使用者打字改變時，清除舊狀態
+    searchInput.addEventListener('input', () => {
+        editor.commands.clearSearch();
+    });
+
+    // [編輯器功能] 22.上一步
+    document.getElementById('undo-btn').addEventListener('click', () => {
+        editor.chain().focus().undo().run();
+        //搜尋及取代功能需要初始化
+        editor.commands.clearSearch();
+    });
+    // [編輯器功能] 23.下一步
+    document.getElementById('redo-btn').addEventListener('click', () => {
+        editor.chain().focus().redo().run();
+        //搜尋及取代功能需要初始化
+        editor.commands.clearSearch();
+    });
+
+    // [編輯器功能] 24.最大化
+    document.getElementById('fullScreen-btn').addEventListener('click', (e) => {
+        // 切換 .is-fullscreen 類別
+        const isNowFullscreen = document.getElementById('editor-container').classList.toggle('is-fullscreen');
+        if (isNowFullscreen) {
+            document.getElementById('fullScreen-btn').title = '最小化';
+        } else {
+            document.getElementById('fullScreen-btn').title = '最大化';
+        }
+        editor.commands.focus();
+    });
+    //#endregion 編輯器功能功能監聽事件
+
+    //#region 顯示邏輯調整
+    // 搜尋及取代功能是否開啟
+    let isSearchMode = false;
+
+    // 監聽編輯器的變動，即時更新狀態
+    editor.on('transaction', () => {
+        // [按鈕]上一步、下一步
+        document.getElementById('undo-btn').disabled = !editor.can().undo();
+        document.getElementById('redo-btn').disabled = !editor.can().redo();
+        // [按鈕]刪除表格
+        document.getElementById('deleteTable-btn').disabled = !editor.isActive('table');
+    });
+
+    // 切換子功能區塊
+    function showSubToolbar(targetBarId) {
+        // 所有可出現的子功能區塊全部隱藏
+        document.getElementById('link-input-bar').style.display = 'none';
+        document.getElementById('linkHref-input').value = '';
+        document.getElementById('image-input-bar').style.display = 'none';
+        document.getElementById('imageHref-input').value = '';
+        document.getElementById('search-replace-input-bar').style.display = 'none';
+        document.getElementById('search-input').value = '';
+        document.getElementById('replace-input').value = '';
+        isSearchMode = false;
+        document.getElementById('tiptap-editor').classList.remove('editor-locked');
+        // 使用者傳入特定的 ID，就只單獨將那一列用 'flex' 打開
+        if (targetBarId === 'link') {
+            document.getElementById('link-input-bar').style.display = 'flex';
+            document.getElementById('linkHref-input').focus();
+        } else if (targetBarId === 'image') {
+            document.getElementById('image-input-bar').style.display = 'flex';
+            document.getElementById('imageHref-input').focus();
+        } else if (targetBarId === 'searchandreplace') {
+            document.getElementById('search-replace-input-bar').style.display = 'flex';
+            document.getElementById('search-input').focus();
+            isSearchMode = true;
+            document.getElementById('tiptap-editor').classList.add('editor-locked');
+        }
+    }
+    // 攔截編輯器區塊內的鍵盤輸入
+    window.addEventListener('keydown', (event) => {
+        if (isSearchMode) {
+            const editArea = editor.options.element.querySelector('.tiptap');
+            // 判斷鍵盤輸入位置於使用者的焦點(Focus)是在編輯器之內
+            if (editArea && editArea.contains(document.activeElement)) {
+                // 攔截所有鍵盤輸入
+                event.preventDefault();
+                event.stopPropagation();
+            }
+        }
+    }, true);
+    //#endregion 顯示邏輯調整
+
+</script>
+
+<body>
+
+    <h3>Tiptap 編輯器</h3>
+    <!-- 表格設定視窗 -->
+    <dialog id="tableDialog" class="editor-modal">
+        <div class="modal-header">表格設定</div>
+        <div class="modal-body">
+            <div class="input-group">
+                <label for="tableRows-num">行數 (Rows)</label>
+                <input type="number" id="tableRows-num" value="3" min="1" max="20" />
+            </div>
+            <div class="input-group">
+                <label for="tableCols-num">列數 (Cols)</label>
+                <input type="number" id="tableCols-num" value="3" min="1" max="20" />
+            </div>
+            <div class="input-group">
+                <label for="tableBorder-num">框線大小 (px)</label>
+                <input type="number" id="tableBorder-num" value="1" min="0" max="10" />
+            </div>
+            <div class="input-group">
+                <label for="tableWidth-num">表格寬度 (px)</label>
+                <input type="number" id="tableWidth-num" value="500" min="0" />
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button id="tableCancel-btn" class="btn-secondary">取消</button>
+            <button id="tableConfirm-btn" class="btn-primary">確認</button>
+        </div>
+    </dialog>
+    <div class="editor-container" id="editor-container">
+        <!-- #region 文字編輯器 -->
+        <!-- 核心紙張區塊：限制最大寬度 -->
+        <div class="paper-wrapper">
+            <!-- 1. 定義工具列 -->
+            <div class="editor-toolbar" id="toolbar">
+                <!-- 字型 -->
+                <select id="fontFamily-select" title="字型" style="font-family: inherit;">
+                    <option value="" style="font-family: inherit;">預設字型</option>
+                    <option value="Arial, sans-serif" style="font-family: Arial, sans-serif;">Arial</option>
+                    <option value="'Times New Roman', serif" style="font-family: &quot;Times New Roman&quot;, serif;">
+                        Times New
+                        Roman
+                    </option>
+                    <option value="'Courier New', monospace" style="font-family: &quot;Courier New&quot;, monospace;">
+                        Courier
+                        New
+                    </option>
+                    <option value="Georgia, serif" style="font-family: Georgia, serif;">Georgia</option>
+                    <option value="Verdana, sans-serif" style="font-family: Verdana, sans-serif;">Verdana</option>
+                    <option value="'Microsoft JhengHei', sans-serif"
+                        style="font-family: &quot;Microsoft JhengHei&quot;, sans-serif;">
+                        微軟正黑體
+                    </option>
+                    <option value="'Microsoft YaHei', sans-serif"
+                        style="font-family: &quot;Microsoft YaHei&quot;, sans-serif;">
+                        微軟雅黑體
+                    </option>
+                    <option value="'PMingLiU', serif" style="font-family: PMingLiU, serif;">新細明體</option>
+                    <option value="'MingLiU', serif" style="font-family: MingLiU, serif;">細明體</option>
+                    <option value="'DFKai-SB', serif" style="font-family: DFKai-SB, serif;">標楷體</option>
+                </select>
+                <!-- 字體大小 -->
+                <select id="fontSize-select" title="字體大小">
+                    <option value="">預設</option>
+                    <option value="8px" style="font-size: 8px;">8</option>
+                    <option value="9px" style="font-size: 9px;">9</option>
+                    <option value="10px" style="font-size: 10px;">10</option>
+                    <option value="11px" style="font-size: 11px;">11</option>
+                    <option value="12px" style="font-size: 12px;">12</option>
+                    <option value="14px" style="font-size: 14px;">14</option>
+                    <option value="16px" style="font-size: 16px;">16</option>
+                    <option value="18px" style="font-size: 18px;">18</option>
+                    <option value="20px" style="font-size: 20px;">20</option>
+                    <option value="22px" style="font-size: 22px;">22</option>
+                    <option value="24px" style="font-size: 24px;">24</option>
+                    <option value="28px" style="font-size: 28px;">28</option>
+                    <option value="32px" style="font-size: 32px;">32</option>
+                    <option value="36px" style="font-size: 36px;">36</option>
+                    <option value="48px" style="font-size: 48px;">48</option>
+                    <option value="72px" style="font-size: 72px;">72</option>
+                </select>
+                <span class="divider"></span>
+                <button id="bold-btn" title="粗體"><b>B</b></button>
+                <button id="italic-btn" title="斜體"><i>I</i></button>
+                <button id="underline-btn" title="底線"><u>U</u></button>
+                <span class="divider"></span>
+                <div style="position: relative; display: inline-block;">
+                    <button id="fontColor-btn" class="button-LB" title="文字顏色">
+                        <span style="text-decoration: underline rgb(0, 0, 0);">A</span>
+                    </button>
+                    <input type="color" id="hiddenFontColorPicker" class="color-picker" />
+                </div>
+                <button id="clearFontColor" title="清除顏色">
+                    <span style="text-decoration: underline rgb(204, 204, 204);">A</span>
+                </button>
+                <div style="position: relative; display: inline-block;">
+                    <button id="backgroundColor-btn" class="button-LB" title="背景色">
+                        <span style="background: rgb(255, 255, 0);">H</span>
+                    </button>
+                    <input type="color" id="hiddenBackgroundColorPicker" class="color-picker" />
+                </div>
+                <button id="clearBackgroundColor" title="清除背景色">
+                    <span style="background: rgb(238, 238, 238); padding: 0px 2px;">H</span>
+                </button>
+                <span class="divider"></span>
+                <button id="alignLeft-btn" title="靠左">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M3 5h18v2H3zm0 4h12v2H3zm0 4h18v2H3zm0 4h12v2H3z"></path>
+                    </svg>
+                </button>
+                <button id="alignCenter-btn" title="置中">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M3 5h18v2H3zm3 4h12v2H6zm-3 4h18v2H3zm3 4h12v2H6z"></path>
+                    </svg>
+                </button>
+                <button id="alignRight-btn" title="靠右">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M3 5h18v2H3zm6 4h12v2H9zm-6 4h18v2H3zm6 4h12v2H9z"></path>
+                    </svg>
+                </button>
+                <button id="justify-btn" title="左右對齊">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M3 5h18v2H3zm0 4h18v2H3zm0 4h18v2H3zm0 4h18v2H3z"></path>
+                    </svg>
+                </button>
+                <span class="divider"></span>
+                <button id="list-btn" title="無序清單">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M4 6a1 1 0 1 1-2 0 1 1 0 0 1 2 0
+                    zm0 6a1 1 0 1 1-2 0 1 1 0 0 1 2 0
+                    zm0 6a1 1 0 1 1-2 0 1 1 0 0 1 2 0
+                    M7 5h14v2H7zm0 6h14v2H7zm0 6h14v2H7z"></path>
+                    </svg>
+                </button>
+                <button id="numlist-btn" title="有序清單">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path data-v-42c014aa=""
+                            d="M3 4h1v4H3zm0 6h1v1H2.5v-.5H3V10zm0 5h1v.5H3v.5h1V17H2v-1h1zm4-10h14v2H7zm0 6h14v2H7zm0 6h14v2H7z">
+                        </path>
+                    </svg>
+                </button>
+                <button id="decreaseIndent-btn" title="減少縮排">
+                    <svg data-v-42c014aa="" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path data-v-42c014aa="" d="M3 5h18v2H3zm0 12h18v2H3zm0-6h18v2H3zM7 9l-4 3 4 3V9z"></path>
+                    </svg>
+                </button>
+                <button id="increaseIndent-btn" title="增加縮排">
+                    <svg data-v-42c014aa="" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path data-v-42c014aa="" d="M3 5h18v2H3zm0 12h18v2H3zm0-6h18v2H3zm4 6V9l4 3-4 3z"></path>
+                    </svg>
+                </button>
+                <span class="divider"></span>
+                <button id="quote-btn" title="引用段落">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M6 17h3l2-4V7H5v6h3zm8 0h3l2-4V7h-6v6h3z"></path>
+                    </svg>
+                </button>
+                <button id="horizon-btn" title="插入水平線">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M3 11h18v2H3z"></path>
+                    </svg>
+                </button>
+                <button id="table-btn" title="插入表格">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path data-v-42c014aa=""
+                            d="M3 3h18v18H3V3zm2 8v4h6v-4H5zm0 6v4h6v-4H5zm8 0v4h6v-4h-6zm0-6v4h6v-4h-6zm0-6v4h6V5h-6zM5 5v4h6V5H5z">
+                        </path>
+                    </svg>
+                </button>
+                <button id="deleteTable-btn" disabled=disabled title="刪除表格">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path data-v-42c014aa=""
+                            d="M3 3h18v18H3V3zm2 8v4h6v-4H5zm0 6v4h6v-4H5zm8 0v4h6v-4h-6zm0-6v4h6v-4h-6zm0-6v4h6V5h-6zM5 5v4h6V5H5zm-.354-.354l.708-.707 18 18-.708.707-18-18zm2.122-2.122L1.31 3.98l1.414 1.415 3.42-3.42-.772-.773zm13.16 19.387l3.418-3.419 1.414 1.414-3.419 3.419-1.414-1.414z">
+                        </path>
+                    </svg>
+                </button>
+                <span class="divider"></span>
+                <button id="link-btn">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                    </svg>
+                </button>
+                <button id="importImage-btn">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                        <polyline points="21 15 16 10 5 21"></polyline>
+                    </svg>
+                </button>
+                <button id="findReplace-btn" title="尋找與取代">
+                    <svg data-v-42c014aa="" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path data-v-42c014aa="" d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16
+                    c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5z
+                    m-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"></path>
+                    </svg>
+                </button>
+                <span class="divider"></span>
+                <button id="undo-btn" disabled=disabled title="復原 (Ctrl+Z)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9
+                    l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88
+                    c3.54 0 6.55 2.31 7.6 5.5l2.37-.78
+                    C21.08 11.03 17.15 8 12.5 8z"></path>
+                    </svg>
+                </button>
+                <button id="redo-btn" disabled=disabled title="重做 (Ctrl+Y)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M18.4 10.6C16.55 8.99 14.15 8 11.5 8
+                    c-4.65 0-8.58 3.03-9.96 7.22L3.9 16
+                    c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88
+                    L13 16h9V7l-3.6 3.6z"></path>
+                    </svg>
+                </button>
+                <span class="divider"></span>
+                <button id="fullScreen-btn" title="最大化">
+                    <svg data-v-42c014aa="" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path data-v-42c014aa=""
+                            d="M3 3h7v2H5v5H3V3zm11 0h7v7h-2V5h-5V3zM3 14h2v5h5v2H3v-7zm16 5h-5v2h7v-7h-2v5z"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- 超連結輸入列(預設隱藏) -->
+            <div class="editor-sub-toolbar" id="link-input-bar">
+                <div style="display: flex; width: 100%;">
+                    <input type="text" id="linkHref-input" placeholder="輸入連結網址..." class="link-input" />
+                    <div class="sub-toolbar-actions">
+                        <button id="linkConfirm-btn" class="btn-sub-primary">確認</button>
+                        <button id="linkRemove-btn" class="btn-sub-danger">移除</button>
+                        <button id="linkCancel-btn" class="btn-sub-secondary">取消</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 圖片輸入列(預設隱藏) -->
+            <div class="editor-sub-toolbar" id="image-input-bar">
+                <div style="display: flex; width: 100%;">
+                    <input type="text" id="imageHref-input" placeholder="輸入圖片網址..." class="link-input" />
+                    <div class="sub-toolbar-actions">
+                        <button id="imageUpload-btn" class="btn-sub-primary">上傳</button>
+                        <input type="file" id="image-file" accept="image/*" style="display: none;" />
+                        <button id="imageConfirm-btn" class="btn-sub-primary">插入</button>
+                        <button id="imageCancel-btn" class="btn-sub-secondary">取消</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 搜尋與取代輸入列(預設隱藏) -->
+            <div class="editor-sub-toolbar" id="search-replace-input-bar">
+                <div style="display: flex; width: 100%;">
+                    <input type="text" id="search-input" placeholder="搜尋..." class="link-input" />
+                    <div class="sub-toolbar-actions">
+                        <button id="searchnext-btn" class="btn-sub-primary">下一個</button>
+                    </div>
+                </div>
+                <div style="display: flex; width: 100%;">
+                    <input type="text" id="replace-input" placeholder="取代為..." class="link-input" />
+                    <div class="sub-toolbar-actions">
+                        <button id="replace-btn" class="btn-sub-primary">取代</button>
+                        <button id="replaceall-btn" class="btn-sub-primary">全部取代</button>
+                    </div>
+                </div>
+                <div class="sub-toolbar-actions">
+                    <label>
+                        <input type="checkbox" id="matchCase-chk" />
+                        大小寫須相符
+                    </label>
+                    <label>
+                        <input type="checkbox" id="wholeWord-chk" />
+                        全字拼寫須相符
+                    </label>
+                    <label>
+                        <input type="checkbox" id="wrapSearch-chk" checked=checked />
+                        循環搜尋
+                    </label>
+                    <button id="search-replace-Cancel-btn" class="btn-sub-secondary">關閉</button>
+                </div>
+            </div>
+
+            <!-- 文字編輯區塊 -->
+            <div class="editor-content" id="tiptap-editor"></div>
+        </div>
+        <!-- #endregion 文字編輯器 -->
+    </div>
+    <!-- 儲存/輸出按鈕 -->
+    <button id="save-btn" style="margin-top: 10px; background: #28a745; color: white;">輸出 HTML</button>
+
+    <!-- 取消編輯 -->
+    <button id="EditorEnable-btn" style="margin-top: 10px; background: #28a745; color: white;">編輯</button>
+
+    <!-- 用來顯示輸出結果的區塊 -->
+    <pre id="output" style="background: #eee; padding: 10px; margin-top: 10px; white-space: pre-wrap;"></pre>
+
+
+</body>
+
+<script>
+    editor;
+    // 「開啟/關閉編輯」按鈕
+    document.getElementById('EditorEnable-btn').addEventListener('click', () => {
+        console.log(editor);
+        if (editor) {
+            const newHTML = '<div style="font-size:inherit"> <p style="font-size:inherit; text-align:center"><span style="font-size:48px"><span style="background-color:#f1c40f; font-size:inherit">你的電腦安裝<span style="color:#e74c3c; font-size:inherit">軟體版本過就</span>，請查看下方&quot;<span style="color:#e74c3c; font-size:inherit">不符規定</span>&quot;，盡快更新!!</span></span></p>  <p style="font-size:inherit; text-align:center">[[TITLE]]<br style="font-size: inherit;" /> [[TABLE_SUMMARY]]</p> </div> ';
+            const newHTML1 = '<p style="text-align: center;"><span style="background-color: rgb(241, 196, 15); font-size: 48px;">你的電腦安裝</span><span style="color: rgb(231, 76, 60); background-color: rgb(241, 196, 15); font-size: 48px;">軟體版本過就</span><span style="background-color: rgb(241, 196, 15); font-size: 48px;">，請查看下方"</span><span style="color: rgb(231, 76, 60); background-color: rgb(241, 196, 15); font-size: 48px;">不符規定</span><span style="background-color: rgb(241, 196, 15); font-size: 48px;">"，盡快更新!!</span></p><p style="text-align: center;">[[TITLE]]<br>[[TABLE_SUMMARY]]</p> ';
+            const newHTML2 = '<div style="font-size:inherit"> <p style="font-size:inherit; text-align:center"><span style="font-size:48px"><span style="background-color:#f1c40f; font-size:inherit">你的電腦</span><span style="font-size:10px"><span style="background-color:#f1c40f; font-size:inherit">安裝<span style="color:#e74c3c; font-size:inherit">軟體</span></span></span><span style="background-color:#f1c40f; font-size:inherit"><span style="color:#e74c3c; font-size:inherit">版本過就</span>，請</span><span style="font-size:20px"><span style="background-color:#f1c40f; font-size:inherit">查看下</span></span><span style="background-color:#f1c40f; font-size:inherit">方&quot;<span style="color:#e74c3c; font-size:inherit">不符規定</span>&quot;，盡快更新!!</span></span></p>  <p style="font-size:inherit; text-align:center">[[TITLE]]<br style="font-size: inherit;" /> [[TABLE_SUMMARY]]</p> </div> ';
+            const newHTML_pic = '<p style="text-align:center"><img alt="" src="Files\\Images\\IF\\阿巴阿巴.jpg" style="height:225px; width:225px; text-align:center" /></p>  <p style="text-align:center">[[TITLE]]<br/> [[TABLE_SUMMARY]]</p> ';
+            const newHTML_pic1 = '<p style="font-size:inherit; text-align:center"><img alt="" src="Files\\Images\\IF\\阿巴阿巴.jpg" style="font-size:inherit; height:225px; width:225px" /></p>  <p style="font-size:inherit; text-align:center"><a href="https://google.com" style="font-size: inherit;">google</a></p>  <p style="font-size:inherit; text-align:center">[[TITLE]]<br style="font-size: inherit;" /> [[TABLE_SUMMARY]]</p> ';
+            const newHTML_complex = '<div style="font-size:inherit"><ol style="font-size:inherit"><li style="text-align: right;font-size: inherit;"><span style="font-size:48px"><span style="background-color:#f1c40f; font-size:inherit">你的電腦</span></span></li></ol><p style="font-size:inherit; text-align:right"><span style="font-size:48px"><span style="font-size:10px"><span style="background-color:#f1c40f; font-size:inherit">安裝<span style="color:#e74c3c; font-size:inherit">軟體</span></span></span><span style="background-color:#f1c40f; font-size:inherit"><span style="color:#e74c3c; font-size:inherit">版<u style="font-size:inherit">本</u></span></span><span style="font-size:inherit"><span style="color:#e74c3c; font-size:inherit"><u style="font-size:inherit">過</u>就</span></span><span style="background-color:#f1c40f; font-size:inherit">，請</span><a href="http://321" style="font-size: inherit;"><span style="font-size:20px"><span style="background-color:#f1c40f; font-size:inherit">查看下</span></span></a><span style="background-color:#f1c40f; font-size:inherit"><a href="http://321" style="font-size: inherit;">方</a>&quot;<span style="color:#e74c3c; font-size:inherit">不符規定</span>&quot;，<em style="font-size:inherit">盡</em>快更</span></span></p><hr style="font-size: inherit;" /><blockquote style="font-size: inherit;"><p style="font-size:inherit; text-align:right"><span style="font-size:48px"><span style="background-color:#f1c40f; font-size:inherit">新!!</span></span></p></blockquote><p style="font-size:inherit; text-align:center">[[TITLE]]<br style="font-size: inherit;" />[[TABLE_SUMMARY]]</p></div>';
+            const newHTML_complex1 = '<p><strong>成功了！</strong> 是SIP嗎，是</p><table style="min-width: 75px;"><colgroup><col style="min-width: 25px;"><col style="min-width: 25px;"><col style="min-width: 25px;"></colgroup><tbody><tr><th colspan="1" rowspan="1"><p>3<span style="color: rgb(76, 222, 13);">3</span>33</p></th><th colspan="1" rowspan="1"><p></p></th><th colspan="1" rowspan="1"><p></p></th></tr><tr><td colspan="1" rowspan="1"><p></p></td><td colspan="1" rowspan="1"><p></p></td><td colspan="1" rowspan="1"><p></p></td></tr><tr><td colspan="1" rowspan="1"><p></p></td><td colspan="1" rowspan="1"><p></p></td><td colspan="1" rowspan="1"><p></p></td></tr></tbody></table><p>吧SIPSIPSIP。</p>';
+            editor.commands.setContent(newHTML_complex1);
+        }
+    });
+
+    // 綁定「輸出 HTML」按鈕
+    document.getElementById('save-btn').addEventListener('click', () => {
+        // 取得編輯器目前的 HTML 字串
+        const html = editor.getHTML();
+        // 顯示在畫面或 Console 上
+        console.log('目前的 HTML：', html);
+        document.getElementById('output').innerText = html;
+    });
+</script>
+
+</html>
+
+這是新的Tiptap文字編輯器。
+SIP sip SIP sip
