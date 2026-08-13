@@ -1,5 +1,5 @@
 # Pure JS Tiptap Editor
-A minimalist, high-performance rich text editor built using **Tiptap** and **Pure Vanilla JavaScript**. 
+A minimalist rich text editor built using **Tiptap** and **Pure Vanilla JavaScript**. 
 ## Features
 - **Framework-Free / Pure JS**: Built entirely with vanilla JavaScript, providing zero framework overhead and full control over your code.
 - **Custom Toolbar**: Fully custom-built UI using vanilla DOM queries and click listeners.
