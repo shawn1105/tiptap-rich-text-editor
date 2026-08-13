@@ -1,8 +1,18 @@
 # Pure JS Tiptap Editor
 A minimalist rich text editor built using **Tiptap** and **Pure Vanilla JavaScript**. 
+
+使用 Tiptap 與純 JavaScript 建立的極簡風格富文字編輯器。
 ## Features
-- **Framework-Free / Pure JS**: Built entirely with vanilla JavaScript, providing zero framework overhead and full control over your code.
-- **Custom Toolbar**: Fully custom-built UI using vanilla DOM queries and click listeners.
+- **Framework-Free / Pure JS**
+
+	Built with vanilla JavaScript without any frameworks.
+
+	使用純原生 JavaScript 建立，不依賴任何框架。
+- **Custom Toolbar**
+
+	Fully custom-built UI using vanilla DOM queries and click listeners.
+
+	完全使用原生 DOM 客製化建立 UI 及監聽事件。
 ![](./.github/assets/TestCase-Demo.png)
  
 ---
