@@ -3,6 +3,7 @@ A minimalist, high-performance rich text editor built using **Tiptap** and **Pur
 ## Features
 - **Framework-Free / Pure JS**: Built entirely with vanilla JavaScript, providing zero framework overhead and full control over your code.
 - **Custom Toolbar**: Fully custom-built UI using vanilla DOM queries and click listeners.
+![](./.github/assets/TestCase-Demo.png)
  
 ---
 # 👉 TipTap 套件建置
